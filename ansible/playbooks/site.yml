@@ -1,0 +1,9 @@
+---
+
+- name: "Configure TeamSpeak server(s)"
+  hosts: teamspeak*
+  become: true
+  vars_files:
+    - "{{ inventory_dir }}/secrets/vault.yaml"
+  roles:
+    - ansible-role-docker-teamspeak

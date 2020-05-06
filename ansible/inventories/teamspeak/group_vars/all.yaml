@@ -1,0 +1,11 @@
+---
+
+# a default server instance
+docker_teamspeak_servers:
+  - server: default
+    voice_server_port: 9987
+    server_query_port: 10077
+    file_transfer_port: 30033
+    database_password: '{{ vaulted_database_password }}'
+    restart: always
+    stopped: no
