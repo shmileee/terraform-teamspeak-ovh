@@ -3,7 +3,7 @@ data "openstack_networking_network_v2" "public" {
 }
 
 resource "openstack_networking_port_v2" "public" {
-  count          = var.teamspeak_count
+  count          = var.instances_count
   name           = "${var.name}_${count.index}"
   network_id     = data.openstack_networking_network_v2.public.id
   admin_state_up = "true"
@@ -63,7 +63,7 @@ CLOUDCONFIG
 }
 
 resource "openstack_compute_instance_v2" "nodes" {
-  count           = var.teamspeak_count
+  count           = var.instances_count
   name            = "${var.name}_${count.index}"
   image_name      = "Ubuntu 18.04"
   flavor_name     = var.flavor_name
