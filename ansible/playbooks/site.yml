@@ -1,9 +1,19 @@
 ---
 
+- name: Wait for ssh to come up
+  hosts: 127.0.0.1
+  tasks:
+    - wait_for: host="{{ item }}" port=22 delay=10 timeout=300
+      with_items: "{{ groups['teamspeak3_servers'] }}"
+
 - name: "Configure TeamSpeak server(s)"
-  hosts: teamspeak*
+  hosts: teamspeak3_servers
   become: true
   vars_files:
-    - "{{ inventory_dir }}/secrets/vault.yaml"
+    - "{{ playbook_dir }}/../inventories/teamspeak/secrets/vault.yaml"
+  pre_tasks:
+    # https://github.com/ansible/ansible/issues/51663
+    - name: Wait for APT locks to be released
+      shell: while fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do sleep 5; done;
   roles:
     - ansible-role-docker-teamspeak

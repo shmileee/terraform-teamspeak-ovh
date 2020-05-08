@@ -1,3 +1,6 @@
 .terraform
 .dep_check
 output/
+terraform.tfstate*
+ansible/roles/geerlingguy.docker
+ansible/roles/ansible-role-docker-teamspeak

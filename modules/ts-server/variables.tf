@@ -17,7 +17,7 @@ variable "flavor_name" {
   default     = "s1-2"
 }
 
-variable "teamspeak_count" {
+variable "instances_count" {
   description = "Number of teamspeak instances per region"
   default     = 1
 }

@@ -3,12 +3,12 @@
 set -e
 shopt -s extglob
 
+cwd="$(cd "$(dirname ${BASH_SOURCE[0]})" && pwd)"
+
 # Defaults variables
 export INSTANCES_COUNT=1
 export AUTO_APPROVE=false
 export AVAILABLE_CMDS='@(refresh|plan|apply|destroy|validate)'
-
-cwd="$(cd "$(dirname ${BASH_SOURCE[0]})" && pwd)"
 
 [ -f ~/openrc.sh ] && source ~/openrc.sh
 
@@ -39,6 +39,8 @@ display_help() {
     echo "  -n, --number            number of instances (default: ${INSTANCES_COUNT})"
     echo "  -c, --command           select terraform command to run"
     echo "                          possible options: ${AVAILABLE_CMDS}"
+    echo "  -t, --title             name of the deployment"
+    echo "  -b, --backend           backend to use to terraform"
     echo "  -a, --auto-approve      auto-approve terraform command (default: false)"
     echo "  -h, --help              display this help message"
     echo
@@ -70,6 +72,14 @@ while [[ $# -gt 0 ]]; do
             INSTANCES_COUNT=${2}
             shift
             ;;
+        -t|--title)
+            TITLE=${2}
+            shift
+            ;;
+        -b|--backend)
+            BACKEND=${2}
+            shift
+            ;;
         -c|--command)
             case $2 in
                 ${AVAILABLE_CMDS})
@@ -88,7 +98,9 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-[ "$INSTANCES_COUNT" ] || exit_help "Number of instances not specified!"
+[ "$INSTANCES_COUNT" ] || exit_help "Number of instances was not specified!"
+[ "$TITLE" ] || exit_help "Title of the deployment was not specified!"
+[ "$BACKEND" ] || exit_help "Backend name was not specified!"
 [ "$COMMAND" ] || exit_help "Terraform command to run was not specified!"
 
 build_output="output/terraform-run-$COMMAND-$(__iso8601_date)"
@@ -99,6 +111,8 @@ mkdir -p output
 exec &> >(tee -a "${build_output}.log")
 
 echo "[+] Selected command: $COMMAND"
+echo "[+] Selected backend: $BACKEND"
+echo "[+] Selected deployment title: $TITLE"
 echo "[+] Selected number of instances: $INSTANCES_COUNT"
 echo "[+] Automatically approve: $AUTO_APPROVE"
 
@@ -150,13 +164,16 @@ set_terraform_vars() {
     export TF_VAR_ssh_public_key="~/.ssh/id_rsa.pub"
     export TF_VAR_ssh_private_key="~/.ssh/id_rsa"
     export TF_VAR_ssh_user="ubuntu"
-    export TF_VAR_name="teamspeak"
+    export TF_VAR_name="${TITLE}"
     export TF_VAR_flavor_name="s1-2"
-    export TF_VAR_teamspeak_count="${INSTANCES_COUNT}"
+    export TF_VAR_instances_count="${INSTANCES_COUNT}"
 }
 
+# first: init with WAW region
+[ ! -e ${cwd}/.terraform ] && retry 1 terraform init -backend-config="container=${BACKEND}"
+
+# next: set region to WAW1
 set_terraform_vars
-[ ! -e ${cwd}/.terraform ] && terraform init
 
 tf_cmd=()
 tf_cmd+="${COMMAND}"
@@ -166,8 +183,16 @@ case "${COMMAND}" in
         tf_cmd+=("--parallelism" "20")
         if [ "${COMMAND}" != "plan" -a "${AUTO_APPROVE}" == "true" ]; then
             tf_cmd+=("-auto-approve")
+            tf_cmd+=("-lock=false")
         fi
 esac
 
-
 retry 1 terraform "${tf_cmd[@]}"
+status=$?
+
+case "${COMMAND}" in
+    apply)
+    if [ "${status}" == 0 ]; then
+        cd "${cwd}/ansible" && make SSH_USER=${TF_VAR_ssh_user}
+    fi
+esac

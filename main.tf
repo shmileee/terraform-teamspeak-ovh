@@ -1,7 +1,6 @@
-# Backend
 terraform {
   backend "swift" {
-    container = "teamspeak-terraform"
+    region_name = "WAW"
   }
 }
 
@@ -11,7 +10,7 @@ variable "region" {
 }
 
 variable "name" {
-  description = "Name of mysql instance"
+  description = "Name of the instance"
 }
 
 variable "ssh_public_key" {
@@ -29,8 +28,8 @@ variable "flavor_name" {
   default     = "s1-2"
 }
 
-variable "teamspeak_count" {
-  description = "Number of mysql instances per region"
+variable "instances_count" {
+  description = "Number instances per region"
   default     = 1
 }
 
@@ -50,7 +49,7 @@ module "ts-server" {
   ssh_private_key = var.ssh_private_key
   name            = var.name
   flavor_name     = var.flavor_name
-  teamspeak_count     = var.teamspeak_count
+  instances_count = var.instances_count
   region          = var.region
 }
 
