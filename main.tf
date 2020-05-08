@@ -1,3 +1,9 @@
+terraform {
+  backend "swift" {
+    region_name = "WAW"
+  }
+}
+
 # Variables
 variable "region" {
   default = "WAW1"

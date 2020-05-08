@@ -8,10 +8,7 @@ cwd="$(cd "$(dirname ${BASH_SOURCE[0]})" && pwd)"
 # Defaults variables
 export INSTANCES_COUNT=1
 export AUTO_APPROVE=false
-export BACKEND_DIR="${cwd}/backend/waw/swift"
 export AVAILABLE_CMDS='@(refresh|plan|apply|destroy|validate)'
-export AVAILABLE_BACKENDS='@(teamspeak|playground)'
-
 
 [ -f ~/openrc.sh ] && source ~/openrc.sh
 
@@ -44,7 +41,6 @@ display_help() {
     echo "                          possible options: ${AVAILABLE_CMDS}"
     echo "  -t, --title             name of the deployment"
     echo "  -b, --backend           backend to use to terraform"
-    echo "                          possible options: ${AVAILABLE_BACKENDS}"
     echo "  -a, --auto-approve      auto-approve terraform command (default: false)"
     echo "  -h, --help              display this help message"
     echo
@@ -81,14 +77,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -b|--backend)
-            case $2 in
-                ${AVAILABLE_BACKENDS})
-                    BACKEND=$2
-                    ;;
-                *)
-                    exit_help "Unknown command: $2"
-                    ;;
-            esac
+            BACKEND=${2}
             shift
             ;;
         -c|--command)
@@ -123,7 +112,7 @@ exec &> >(tee -a "${build_output}.log")
 
 echo "[+] Selected command: $COMMAND"
 echo "[+] Selected backend: $BACKEND"
-echo "[+] Selected deployment title: $title"
+echo "[+] Selected deployment title: $TITLE"
 echo "[+] Selected number of instances: $INSTANCES_COUNT"
 echo "[+] Automatically approve: $AUTO_APPROVE"
 
@@ -181,7 +170,7 @@ set_terraform_vars() {
 }
 
 # first: init with WAW region
-[ ! -e ${cwd}/.terraform ] && retry 1 terraform init -backend-config="${BACKEND_DIR}/${BACKEND}"
+[ ! -e ${cwd}/.terraform ] && retry 1 terraform init -backend-config="container=${BACKEND}"
 
 # next: set region to WAW1
 set_terraform_vars
@@ -194,7 +183,16 @@ case "${COMMAND}" in
         tf_cmd+=("--parallelism" "20")
         if [ "${COMMAND}" != "plan" -a "${AUTO_APPROVE}" == "true" ]; then
             tf_cmd+=("-auto-approve")
+            tf_cmd+=("-lock=false")
         fi
 esac
 
 retry 1 terraform "${tf_cmd[@]}"
+status=$?
+
+case "${COMMAND}" in
+    apply)
+    if [ "${status}" == 0 ]; then
+        cd "${cwd}/ansible" && make SSH_USER=${TF_VAR_ssh_user}
+    fi
+esac

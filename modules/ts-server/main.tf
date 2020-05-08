@@ -22,8 +22,25 @@ data "template_file" "setup" {
   template = <<SETUP
 #!/bin/bash
 
+apt_wait () {
+  while sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1 ; do
+    sleep 1
+  done
+  while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ; do
+    sleep 1
+  done
+  while sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1 ; do
+    sleep 1
+  done
+  if [ -f /var/log/unattended-upgrades/unattended-upgrades.log ]; then
+    while sudo fuser /var/log/unattended-upgrades/unattended-upgrades.log >/dev/null 2>&1 ; do
+      sleep 1
+    done
+  fi
+}
+
 # install softwares & depencencies
-apt update -y && apt install -y ufw python3 python3-pip
+apt update -y && apt install -y ufw python3 python3-pip && apt_wait
 pip3 install docker docker-compose
 
 # setup firewall
@@ -74,12 +91,21 @@ resource "openstack_compute_instance_v2" "nodes" {
   network {
     name = "Ext-Net"
   }
-}
 
-resource "null_resource" "inventory" {
-  depends_on = [openstack_compute_instance_v2.nodes]
+  metadata = {
+    teamspeak3_servers = ""
+  }
 
-  provisioner "local-exec" {
-    command =  "cd ${path.cwd}/ansible && make OS_REGION_NAME=${var.region} SSH_USER=${var.ssh_user}"
+  provisioner "remote-exec" {
+    connection {
+      type        = "ssh"
+      user        = var.ssh_user
+      timeout     = "3m"
+      private_key = file(var.ssh_private_key)
+      host        = self.access_ip_v4
+    }
+    inline = [
+      "cloud-init status --wait"
+    ]
   }
 }
